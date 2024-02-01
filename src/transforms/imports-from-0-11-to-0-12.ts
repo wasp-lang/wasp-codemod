@@ -9,7 +9,16 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
   const newSpecifierName = 'newFoo';
   const newSpecifierSource = 'wasp/server';
 
-  let newSpecifiers: ImportSpecifier[] = [];
+  let newImports: Map<string, ImportSpecifier[]> = new Map();
+
+  function addImport(source: string, specifier: ImportSpecifier) {
+    const existingSpecifiers = newImports.get(source);
+    if (existingSpecifiers) {
+      existingSpecifiers.push(specifier);
+    } else {
+      newImports.set(source, [specifier]);
+    }
+  }
 
   root
     .find(j.ImportDeclaration, {
@@ -24,13 +33,15 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
 
       const remainingSpecifiers = specifiers.filter((specifier) => {
         if (specifier.type === "ImportSpecifier" && specifier.imported.name === oldSpecifierName) {
-          newSpecifiers.push(j.importSpecifier(j.identifier(newSpecifierName), specifier.local));
+          const newSpecifier = j.importSpecifier(j.identifier(newSpecifierName), specifier.local)
+          addImport(newSpecifierSource, newSpecifier);
           return false;
         }
         return true;
       });
 
-      // Remove old specifier from the import declaration.
+      // Remove old specifier from the import declaration,
+      // or remove whole import declaration if it has no specifiers left.
       if (remainingSpecifiers.length) {
         path.value.specifiers = remainingSpecifiers;
       } else {
@@ -38,14 +49,16 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
       }
     });
 
-  // Add new import declaration, with all the new specifiers we collected.
+  // Add new import declarations, with all the new specifiers we collected.
   root.find(j.Program).forEach((path) => {
-    path.node.body.unshift(
-      j.importDeclaration(
-        newSpecifiers,
-        j.literal(newSpecifierSource)
+    newImports.forEach((specifiers, source) => {
+      path.node.body.unshift(
+        j.importDeclaration(
+          specifiers,
+          j.literal(source)
+        )
       )
-    )
+    });
   });
 
   return root.toSource();
