@@ -24,4 +24,6 @@ to previous state in case you don't like the changes or something goes wrong
 
 Run
 `npm run imports-0-11:test`
-to do a dry run on a test file and print potential modification on stdout.
+to do a dry run on test files in `test/` dir and print modified content of files on output.
+
+There is also an output-* file(s) in `test/` so you can compare manually for expected output -> we don't yet have any automatic comparison set up.
