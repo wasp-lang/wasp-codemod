@@ -22,10 +22,12 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
     const newSpecifierSource = importMapping.new.path;
 
     // TODO: Handle isType, isDefault, isUserDef.
+    // If we have default import, we can't assume its name!
     // What about special cases? Like user def? Or paths with variable parts?
     // Or that case where it maps to null? Handle these special cases.
     // I also want to write a nice test file.
     // And I need to add real mappings down there.
+    // What about the cases where the extension is .js or .ts or jsx or ...? How can we be robust to that and how do we want to behave?
 
     root
       .find(j.ImportDeclaration, {
@@ -39,10 +41,8 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
         if (!specifiers) return;
 
         const remainingSpecifiers = specifiers.filter((specifier) => {
-          if (
-            specifier.type === "ImportSpecifier" &&
-            specifier.imported.name === oldSpecifierName
-          ) {
+          if (importMapping.old.isDefault && specifier.type === "ImportDefaultSpecifier"
+              || !importMapping.old.isDefault && specifier.type === "ImportSpecifier" && specifier.imported.name === oldSpecifierName) {
             const newSpecifier = j.importSpecifier(j.identifier(newSpecifierName), specifier.local);
             addImport(newSpecifierSource, newSpecifier);
             return false;
@@ -70,13 +70,23 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
   return root.toSource();
 }
 
+export const parser = 'babel';  // TODO: This one can't parse Typescript, but others just skip the file hm.
+
 const importMappings = [
   {
-    old: { path: "@wasp/server", name: "foo" },
-    new: { path: "wasp/server", name: "newFoo" },
+    old: { path: "@wasp/config", name: "config", isDefault: true },
+    new: { path: "wasp/server", name: "config", isSame: true },
   },
   {
-    old: { path: "@wasp/test", name: "test" },
-    new: { path: "wasp/server/test", name: "test" },
+    old: { path: "@wasp/auth/helpers/GitHub", name: "SignInButton" },
+    new: { path: "wasp/client/auth", name: "GitHubSignInButton", isSame: false },
   },
+  {
+    old: { path: "@wasp/auth/helpers/Google", name: "SignInButton" },
+    new: { path: "wasp/client/auth", name: "GoogleSignInButton", isSame: false },
+  },
+  {
+    old: { path: "@wasp/auth/forms/types", name: "CustomizationOptions", isType: true },
+    new: { path: "wasp/client/auth", name: "CustomizationOptions", isSame: true },
+  }
 ];
