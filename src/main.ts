@@ -3,9 +3,7 @@ import path from "node:path";
 
 async function main() {
   const transformPath = path.resolve("src/transforms/imports-from-0-11-to-0-12.ts");
-  const paths = ["test/imports-from-0-11-to-0-12.ts"];
-  // const transformPath = path.resolve('src/transforms/foo-to-bar.ts')
-  // const paths = ['test/foo-to-bar.js']
+  const paths = ["test/imports-from-0-11-to-0-12/input-1.ts"];
   const options = {
     dry: true,
     print: true,
