@@ -6,17 +6,17 @@ async function main() {
 
   let args = process.argv.slice(2);
 
-  let isDry = false;
-  if (args.length > 0 && args[0] === "--dry")) {
-    isDry = true;
+  let isTest = false;
+  if (args.length > 0 && args[0] === "--test") {
+    isTest = true;
     args = args.slice(1);
   }
 
   const paths = args;
 
   const options = {
-    dry: isDry,
-    print: true,
+    dry: isTest,
+    print: isTest,
     verbose: 0,
     // ...
   };
