@@ -2,9 +2,9 @@
   "name": "wasp-codemod",
   "version": "0.1.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
-    "start": "ts-node src/main.ts",
+    "imports-0-11:test": "npm run imports-0-11 --dry test/imports-from-0-11-to-0-12/input-1.ts",
+    "imports-0-11": "ts-node src/transform-imports-from-0-11-to-0-12.ts",
     "format": "prettier . --write",
     "lint": "eslint ."
   },
