@@ -8,6 +8,11 @@ export const parser = "tsx";
 // specifiers/names from the import declaration and add a new import declaration with
 // the new 0.12 import path and the matching specifiers.
 export default function transformer(fileInfo: FileInfo, api: API, options: Options) {
+  if (!([".js", ".ts", ".jsx", ".tsx"].some((ext) => fileInfo.path.endsWith(ext)))) {
+    console.log(fileInfo.path + " is not a JS/TS(X) file, skipping.")
+    return fileInfo.source;
+  }
+
   const j = api.jscodeshift;
   const root = j(fileInfo.source);
 
