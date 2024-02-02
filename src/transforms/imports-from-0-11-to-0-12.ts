@@ -32,12 +32,12 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
     root
       .find(j.ImportDeclaration, {
         source: {
-          type: "Literal",
           value: oldSpecifierSource,
         },
       })
       .forEach((path) => {
         const specifiers = path.value.specifiers;
+        console.log(specifiers);
         if (!specifiers) return;
 
         const remainingSpecifiers = specifiers.filter((specifier) => {
@@ -70,7 +70,7 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
   return root.toSource();
 }
 
-export const parser = 'babel';  // TODO: This one can't parse Typescript, but others just skip the file hm.
+export const parser = 'tsx';
 
 const importMappings = [
   {
