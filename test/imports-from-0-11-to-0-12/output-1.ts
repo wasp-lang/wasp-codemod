@@ -1,7 +1,7 @@
 import {
-  GitHubSignInButton as SignInButton,
-  GoogleSignInButton,
   type CustomizationOptions,
+  GoogleSignInButton,
+  GitHubSignInButton as SignInButton,
 } from "wasp/client/auth";
 
 import { config } from "wasp/server";
