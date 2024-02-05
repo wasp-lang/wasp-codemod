@@ -1,9 +1,15 @@
+import { type SomeEntity, type AnotherEntity } from "wasp/entities";
+
 import {
   type CustomizationOptions,
-  GoogleSignInButton,
   GitHubSignInButton as SignInButton,
+  GoogleSignInButton,
 } from "wasp/client/auth";
 
+import { superCoolJob, amazingJob } from "wasp/server/jobs";
+import { type BestApiEver, type OneMoreApi } from "wasp/server/api";
+import { type DoSomething, type GetSomething as GetSomethingType } from "wasp/server/operations";
+import { doSomething, getSomething as getSomethingPliz } from "wasp/client/operations";
 import { config } from "wasp/server";
 // Testing default import, additional unknown named import, and .js extension.
 import { bar } from "@wasp/config.js";

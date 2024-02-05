@@ -25,6 +25,15 @@ Example:
 npm run imports-0-11 -- /home/martin/git/MyWaspProject/src
 ```
 
+NOTE: `isPrismaError` and `prismaErrorToHttpError` from `@wasp/utils` stopped existing,
+  and while we will remove that those imports for you, make sure to manually update any code that
+  was using those imports.
+
+NOTE: The only imports we don't automatically rewrite for you are `crud` imports.
+  If you have any of those (they start with `@wasp/crud/`), make sure to rewrite them manually.
+  New imports look like `import { NameOfYourCrud } from 'wasp/server/crud'` and
+  `import { NameOfYourCrud } from 'wasp/client/crud`.
+
 ## For contributors
 
 ### Updating Wasp 0.11 imports to Wasp 0.12 imports.

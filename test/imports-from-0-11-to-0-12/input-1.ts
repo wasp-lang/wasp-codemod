@@ -6,6 +6,17 @@ import { SignInButton } from "@wasp/auth/helpers/GitHub.tsx";
 import { SignInButton as GoogleSignInButton } from "@wasp/auth/helpers/Google";
 // Testing `type` import from index.js file.
 import { type CustomizationOptions } from "@wasp/auth/forms/types/index.js";
+// Testing imports that should get removed (deprecated).
+import { prismaErrorToHttpError, isPrismaError } from "@wasp/utils";
+// Testing imports with user defined stuff.
+import doSomething from "@wasp/actions/doSomething";
+import { type DoSomething } from "@wasp/actions/types";
+import getSomethingPliz from "@wasp/queries/getSomething";
+import { type GetSomething as GetSomethingType } from "@wasp/queries/types";
+import { type BestApiEver, type OneMoreApi } from "@wasp/apis/types";
+import { type SomeEntity, type AnotherEntity } from "@wasp/entities";
+import { superCoolJob } from "@wasp/jobs/superCoolJob";
+import { amazingJob } from "@wasp/jobs/amazingJob";
 // Testing unknown import from @wasp.
 import { foo } from "@wasp/foo";
 // Testing unknown import from external package.

@@ -30,24 +30,90 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
   for (const importMapping of importMappings) {
     // TODO:
     // What about special cases? Like user def? Or paths with variable parts?
-    // Or that case where it maps to null? Handle these special cases.
+    // Cases:
+    //
+    //  1. A module name is user defined. Imported name is default.
+    //       Example: `import <myAction_> from '@wasp/actions/<myAction>';`
+    //           into `import { <myAction> as <myAction_> } from 'wasp/client/operations';`
+    //     In this case we need to detect modules that have the prefix we know about,
+    //     and then extract the name of the module and use it as the new import name.
+    //     Where: actions (hooks), queries (hooks).
+    //
+    //  2. A module name is fixed, import name is user defined.
+    //       Example: `import { type <MyAction> } from '@wasp/actions/types';`
+    //           into `import { type <MyAction> } from 'wasp/server/operations';`
+    //     In this case we don't really know the names, we know only the module name,
+    //     meaning we need to assume all the names in there are user defined.
+    //     Where: actions (types), queries (types), apis, entities.
+    //
+    //  3. A module name is user defined, imported name is fixed, and in new import
+    //     we use the old module name as new import name.
+    //       Example: `import { type UpdateAction } from '@wasp/crud/<MyCrud>';`
+    //           into `import { type <MyCrud> } from 'wasp/server/crud';`
+    //     Similar like case (1), but imported name is fixed, not default,
+    //     and also CRUD replaces stuff with just one import which makes it harder.
+    //     Actually we should probably not do this automatically and just point them to do it
+    //     manually, crud is anyway experimentally feature and it is likely very few people
+    //     are using it.
+    //     Where: crud.
+    //
+    //  4. A module name is user defined. Imported name is not default and is the same as module name.
+    //       Example: `import { <myJob> } from '@wasp/jobs/<myJob>';`
+    //           into `import { <myJob> } from 'wasp/server/jobs';`
+    //     Similar like case (1).
+    //
+    //  New import will always have fixed module name, and user defined import name (which is not default).
+    //
+    // Idea: if path is regex, we treat it in special way: it can have a capturing group. If it has one, we use it
+    //   as the name for a new import, if new import is `isUserDef`.
+    //   Also, if old name is `*`, then it matches all specifiers, and we use the same new name.
+    //
+    // - If path is regex, we execute it, and we obtain the capturing groups and pass them on.
+    //   We make user defined paths regexes with one capturing group.
+    // - If old name is '*', it matches any name, and new is also the same (and new name also has to be '*', or null or something.).
+    //   Actually, this '*' -> this is when old name is userDef, but path is not regex. That means it can be anything.
+    // - If new name is user defined, then we use the value from the first capturing group.
+    //   If there is no first capturing group, that is an error! That can't be.
+    // - If old name is default, then we shouldn't also specify the actual name.
+    // - If new name is userDef, then we shoudln't specify the actual name.
 
-    function doesAnImportPathMatchOldImportPath(importPath: string) {
-      const validPaths = ["", ".js", ".jsx", ".ts", ".tsx", "/index.js", "/index.ts"].map(
-        (suffix) => importMapping.old.path + suffix,
-      );
-      return validPaths.includes(importPath);
+    // Returns a string in case when old import path is regex and it matched the given import path.
+    // Then, returned string is the value of the capturing group from the regex.
+    function tryMatchingAnImportPathOldImportPath(importPath: string): boolean | string {
+      const validSuffixes = ["", ".js", ".jsx", ".ts", ".tsx", "/index.js", "/index.ts"];
+      if (importMapping.old.path instanceof RegExp) {
+        const validPathRegexes = [];
+        for (const suffix of validSuffixes) {
+          validPathRegexes.push(new RegExp(importMapping.old.path.source + escapeRegExp(suffix)));
+        }
+        const matchingPathRegex = validPathRegexes.find((regex) => regex.test(importPath));
+        if (matchingPathRegex) {
+          const match = importPath.match(matchingPathRegex);
+          if (match) return match[1];
+        }
+        return false;
+      } else {
+        const validPaths = validSuffixes.map(
+          (suffix) => importMapping.old.path + suffix,
+        );
+        return validPaths.includes(importPath);
+      }
     }
 
     root
       .find(j.ImportDeclaration)
-      .filter((astPath) => {
-        return (
-          typeof astPath.value.source.value == "string" &&
-          doesAnImportPathMatchOldImportPath(astPath.value.source.value)
-        );
-      })
       .forEach((astPath) => {
+        const importPathsMatch = typeof astPath.value.source.value == "string" &&
+          tryMatchingAnImportPathOldImportPath(astPath.value.source.value)
+        if (!importPathsMatch) {
+          return;
+        }
+        const userDefImportPathName =
+          typeof importPathsMatch === "string" ? importPathsMatch : null;
+
+        const doesOldImportNameMatchAnything: boolean =
+          !userDefImportPathName && importMapping.old.name === userDefName;
+
         const importSpecifiers = astPath.value.specifiers;
         if (!importSpecifiers) return;
 
@@ -56,18 +122,26 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
 
         // Split import specifiers into those that match the old import name
         // and those that don't.
-        importSpecifiers.forEach((importSpecifier) => {
+        for (const importSpecifier of importSpecifiers) {
+          const areBothImportsDefault: boolean =
+            importMapping.old.name === defaultName
+              && importSpecifier.type === "ImportDefaultSpecifier";
+
+          const areBothImportsNamed = importMapping.old.name !== defaultName
+              && importSpecifier.type === "ImportSpecifier";
+
           const doesAnImportSpecifierMatchOldImportName: boolean =
-            (importMapping.old.isDefault && importSpecifier.type === "ImportDefaultSpecifier") ||
-            (!importMapping.old.isDefault &&
-              importSpecifier.type === "ImportSpecifier" &&
-              importSpecifier.imported.name === importMapping.old.name);
+            areBothImportsDefault
+            || areBothImportsNamed &&
+                (doesOldImportNameMatchAnything
+                 || importSpecifier.imported.name === importMapping.old.name)
+
           if (doesAnImportSpecifierMatchOldImportName) {
             matchingImportSpecifiers.push(importSpecifier);
           } else {
             nonMatchingImportSpecifiers.push(importSpecifier);
           }
-        });
+        }
 
         // Update import declaration to have only non-matching specifiers,
         // or remove it if there are no non-matching specifiers left.
@@ -77,19 +151,37 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
           j(astPath).remove();
         }
 
-        // Determine new import specifiers for matching old import specifiers
+        // Determine new import specifiers (if any) for matching old import specifiers
         // and add them to `newImports`.
-        matchingImportSpecifiers.forEach((importSpecifier) => {
-          const newSpecifier = j.importSpecifier(
-            j.identifier(importMapping.new.name),
-            importSpecifier.local,
-          );
-          if (importMapping.new.isType) {
-            // @ts-expect-error https://github.com/benjamn/ast-types/pull/725 .
-            newSpecifier.importKind = "type";
+        if (importMapping.new !== null) {
+          for (const oldImportSpecifier of matchingImportSpecifiers) {
+            const newName: string = (() => {
+              if (typeof importMapping.new.name === "string") {
+                return importMapping.new.name;
+              }
+              if (importMapping.new.name === userDefName) {
+                if (userDefImportPathName) {
+                  return userDefImportPathName;
+                }
+                if (importMapping.old.name === userDefName
+                    && oldImportSpecifier.type === "ImportSpecifier") {
+                  return oldImportSpecifier.imported.name;
+                }
+                throw new Error("I don't know how to determine name for new import.");
+              }
+              throw new Error("This should never happen.");
+            })();
+
+            const newSpecifier = j.importSpecifier(j.identifier(newName), oldImportSpecifier.local);
+
+            if (importMapping.new.isType) {
+              // @ts-expect-error https://github.com/benjamn/ast-types/pull/725 .
+              newSpecifier.importKind = "type";
+            }
+
+            addImportToNewImports(importMapping.new.path, newSpecifier);
           }
-          addImportToNewImports(importMapping.new.path, newSpecifier);
-        });
+        }
       });
   }
 
@@ -103,43 +195,53 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
   return root.toSource();
 }
 
+function escapeRegExp(x: string) {
+  // Copied from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions .
+  return x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
+}
+
+const defaultName = Symbol("default");  // Default import name, with some value.
+const userDefName = Symbol("userDefName");  // Non-default import name that is user defined.
+
+// Old import name can be:
+// - string: named import of known, fixed name, e.g. `config` in `{ config } from '@wasp/config';`
+// - defaultName: default import, any name, e.g. `config` in `import config from '@wasp/config';`
+// - userDefName: named import whose name is defined by user,
+//     e.g. `myAction` in `{ myAction } from '@wasp/actions/myAction';`
+type OldImportName = string | typeof defaultName | typeof userDefName;
+// New import name is same type as old import name, but it can't be default name.
+type NewImportName = string | typeof userDefName;
+
 interface ImportMapping {
   old: {
-    path: string;
-    name: string;
-    isDefault?: boolean;
-    // isUserDef?: boolean; // TODO: Enable once we know how to handle it.
+    path: string | RegExp;
+    name: OldImportName;
   };
-  new: {
+  new: null | {
     path: string;
-    name: string;  // TODO: Handle case when it is null.
+    name: NewImportName;
     isType?: boolean;
-    // isUserDef?: boolean; // TODO: Enable once we know how to handle it.
   };
 }
 
 // NOTE: Old paths must be without any extensions or /index.js or /index.ts suffixes.
 const importMappings: ImportMapping[] = [
   {
-    old: { path: '@wasp/config.js', name: 'config', isDefault: true },
+    old: { path: '@wasp/config.js', name: defaultName },
     new: { path: 'wasp/server', name: 'config' }
   },
   {
-    old: {
-      path: '@wasp/dbClient.js',
-      name: 'prismaClient',
-      isDefault: true
-    },
+    old: { path: '@wasp/dbClient.js', name: defaultName },
     new: { path: 'wasp/server', name: 'prisma' }
   },
-  // {
-  //   old: { path: '@wasp/utils', name: 'isPrismaError' },
-  //   new: { path: null }
-  // },
-  // {
-  //   old: { path: '@wasp/utils', name: 'prismaErrorToHttpError' },
-  //   new: { path: null }
-  // },
+  {
+    old: { path: '@wasp/utils', name: 'isPrismaError' },
+    new: null
+  },
+  {
+    old: { path: '@wasp/utils', name: 'prismaErrorToHttpError' },
+    new: null
+  },
   {
     old: { path: '@wasp/actions', name: 'useAction' },
     new: { path: 'wasp/client/operations', name: 'useAction' }
@@ -152,28 +254,14 @@ const importMappings: ImportMapping[] = [
       isType: true
     }
   },
-  // {
-  //   old: {
-  //     path: '@wasp/actions/<myAction>',
-  //     name: 'myAction',
-  //     isDefault: true,
-  //     isUserDef: true
-  //   },
-  //   new: {
-  //     path: 'wasp/client/operations',
-  //     name: 'myAction',
-  //     isUserDef: true
-  //   }
-  // },
-  // {
-  //   old: { path: '@wasp/actions/types', name: 'MyAction', isUserDef: true },
-  //   new: {
-  //     path: 'wasp/server/operations',
-  //     name: 'MyAction',
-  //     isType: true,
-  //     isUserDef: true
-  //   }
-  // },
+  {
+    old: { path: /@wasp\/actions\/(\w+)/, name: defaultName },
+    new: { path: 'wasp/client/operations', name: userDefName }
+  },
+  {
+    old: { path: '@wasp/actions/types', name: userDefName },
+    new: { path: 'wasp/server/operations', name: userDefName, isType: true }
+  },
   {
     old: { path: '@wasp/queryClient', name: 'configureQueryClient' },
     new: { path: 'wasp/client/operations', name: 'configureQueryClient' }
@@ -182,43 +270,24 @@ const importMappings: ImportMapping[] = [
     old: { path: '@wasp/queries', name: 'useQuery' },
     new: { path: 'wasp/client/operations', name: 'useQuery' }
   },
-  // {
-  //   old: {
-  //     path: '@wasp/queries/<myQuery>',
-  //     name: 'myQuery',
-  //     isDefault: true,
-  //     isUserDef: true
-  //   },
-  //   new: {
-  //     path: 'wasp/client/operations',
-  //     name: 'myQuery',
-  //     isUserDef: true
-  //   }
-  // },
-  // {
-  //   old: { path: '@wasp/queries/types', name: 'MyQuery', isUserDef: true },
-  //   new: {
-  //     path: 'wasp/server/operations',
-  //     name: 'MyQuery',
-  //     isType: true,
-  //     isUserDef: true
-  //   }
-  // },
   {
-    old: { path: '@wasp/api', name: 'api', isDefault: true },
+    old: { path: /@wasp\/queries\/(\w+)/, name: defaultName },
+    new: { path: 'wasp/client/operations', name: userDefName }
+  },
+  {
+    old: { path: '@wasp/queries/types', name: userDefName },
+    new: { path: 'wasp/server/operations', name: userDefName, isType: true }
+  },
+  {
+    old: { path: '@wasp/api', name: defaultName },
     new: { path: 'wasp/client/api', name: 'api' }
   },
-  // {
-  //   old: { path: '@wasp/apis/types', name: 'MyApi', isUserDef: true },
-  //   new: {
-  //     path: 'wasp/server/api',
-  //     name: 'MyApi',
-  //     isType: true,
-  //     isUserDef: true
-  //   }
-  // },
   {
-    old: { path: '@wasp/auth/login', name: 'login', isDefault: true },
+    old: { path: '@wasp/apis/types', name: userDefName },
+    new: { path: 'wasp/server/api', name: userDefName, isType: true }
+  },
+  {
+    old: { path: '@wasp/auth/login', name: defaultName },
     new: { path: 'wasp/client/auth', name: 'login' }
   },
   {
@@ -226,11 +295,11 @@ const importMappings: ImportMapping[] = [
     new: { path: 'wasp/client/auth', name: 'logout' }
   },
   {
-    old: { path: '@wasp/auth/signup', name: 'signup', isDefault: true },
+    old: { path: '@wasp/auth/signup', name: defaultName },
     new: { path: 'wasp/client/auth', name: 'signup' }
   },
   {
-    old: { path: '@wasp/auth/useAuth', name: 'useAuth', isDefault: true },
+    old: { path: '@wasp/auth/useAuth', name: defaultName },
     new: { path: 'wasp/client/auth', name: 'useAuth' }
   },
   {
@@ -336,16 +405,14 @@ const importMappings: ImportMapping[] = [
   {
     old: {
       path: '@wasp/core/AuthError',
-      name: 'AuthError',
-      isDefault: true
+      name: defaultName,
     },
     new: { path: 'wasp/server', name: 'AuthError' }
   },
   {
     old: {
       path: '@wasp/core/HttpError',
-      name: 'HttpError',
-      isDefault: true
+      name: defaultName,
     },
     new: { path: 'wasp/server', name: 'HttpError' }
   },
@@ -365,68 +432,14 @@ const importMappings: ImportMapping[] = [
     old: { path: '@wasp/email', name: 'emailSender' },
     new: { path: 'wasp/email', name: 'emailSender' }
   },
-  // {
-  //   old: { path: '@wasp/crud/<MyCrud>', name: 'GetAllQuery' },
-  //   new: {
-  //     path: 'wasp/server/crud',
-  //     name: 'MyCrud',
-  //     isType: true,
-  //     isUserDef: true
-  //   }
-  // },
-  // {
-  //   old: { path: '@wasp/crud/<MyCrud>', name: 'GetQuery' },
-  //   new: {
-  //     path: 'wasp/server/crud',
-  //     name: 'MyCrud',
-  //     isType: true,
-  //     isUserDef: true
-  //   }
-  // },
-  // {
-  //   old: { path: '@wasp/crud/<MyCrud>', name: 'CreateAction' },
-  //   new: {
-  //     path: 'wasp/server/crud',
-  //     name: 'MyCrud',
-  //     isType: true,
-  //     isUserDef: true
-  //   }
-  // },
-  // {
-  //   old: { path: '@wasp/crud/<MyCrud>', name: 'UpdateAction' },
-  //   new: {
-  //     path: 'wasp/server/crud',
-  //     name: 'MyCrud',
-  //     isType: true,
-  //     isUserDef: true
-  //   }
-  // },
-  // {
-  //   old: { path: '@wasp/crud/<MyCrud>', name: 'DeleteAction' },
-  //   new: {
-  //     path: 'wasp/server/crud',
-  //     name: 'MyCrud',
-  //     isType: true,
-  //     isUserDef: true
-  //   }
-  // },
-  // {
-  //   old: { path: '@wasp/crud/<MyCrud>', name: 'Crud' },
-  //   new: { path: 'wasp/client/crud', name: 'MyCrud', isUserDef: true }
-  // },
-  // {
-  //   old: { path: '@wasp/entities', name: 'MyEntity', isUserDef: true },
-  //   new: {
-  //     path: 'wasp/entities',
-  //     name: 'MyEntity',
-  //     isType: true,
-  //     isUserDef: true
-  //   }
-  // },
-  // {
-  //   old: { path: '@wasp/jobs/<MyJob>', name: 'myJob', isUserDef: true },
-  //   new: { path: 'wasp/server/jobs', name: 'myJob', isUserDef: true }
-  // },
+  {
+    old: { path: '@wasp/entities', name: userDefName },
+    new: { path: 'wasp/entities', name: userDefName, isType: true }
+  },
+  {
+    old: { path: /@wasp\/jobs\/(\w+)/, name: userDefName },
+    new: { path: 'wasp/server/jobs', name: userDefName }
+  },
   {
     old: { path: '@wasp/router', name: 'Link' },
     new: { path: 'wasp/client/router', name: 'Link' }
