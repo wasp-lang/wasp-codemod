@@ -65,31 +65,38 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
         let nonMatchingImportSpecifiers: typeof importSpecifiers = [];
 
         // Split import specifiers into those that match the old import name
-        // and those that don't.
+        // from importMapping and those that don't.
+        // Those that don't match we will leave be as they are.
+        // Those that match we are going to rewrite (this will usually be one or none,
+        // but we treat it as plural just in case).
         for (const importSpecifier of importSpecifiers) {
-          const areBothImportsDefault: boolean =
+          const areBothDefault =
             importMapping.old.name === defaultName
               && importSpecifier.type === "ImportDefaultSpecifier";
 
-          const areBothImportsNamed = importMapping.old.name !== defaultName
+          const areBothNamed =
+            importMapping.old.name !== defaultName
               && importSpecifier.type === "ImportSpecifier";
 
-          const doesAnImportSpecifierMatchOldImportName: boolean =
-            areBothImportsDefault
-            || (areBothImportsNamed
-                && (importMapping.old.name === userDefName
+          const doTheyMatch = 
+            areBothDefault
+            || (areBothNamed
+                && (
+                  // If we are expecting a user defined name, then any import name will match.
+                  importMapping.old.name === userDefName
+                  // Otherwise, they have to match exactly.
                     || importMapping.old.name === importSpecifier.imported.name
-                   )
+                  )
                );
 
-          if (doesAnImportSpecifierMatchOldImportName) {
+          if (doTheyMatch) {
             matchingImportSpecifiers.push(importSpecifier);
           } else {
             nonMatchingImportSpecifiers.push(importSpecifier);
           }
         }
 
-        // Update import declaration to have only non-matching specifiers,
+        // Update observed import declaration in the AST to have only non-matching specifiers,
         // or remove it if there are no non-matching specifiers left.
         if (nonMatchingImportSpecifiers.length) {
           astPath.value.specifiers = nonMatchingImportSpecifiers;
@@ -97,14 +104,20 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
           j(astPath).remove();
         }
 
-        // Determine new import specifiers (if any) for matching old import specifiers
-        // and add them to `newImports`.
+        // Time to do actual import mapping: determine new import specifiers (if any)
+        // for the matching old import specifiers, based on the import mapping,
+        // and add them to the `newImports`.
         if (importMapping.new !== null) {
           for (const oldImportSpecifier of matchingImportSpecifiers) {
             const newName: string = (() => {
+              // If new import name is fixed, use it.
               if (typeof importMapping.new.name === "string") {
                 return importMapping.new.name;
               }
+              // If new import name is user defined, that means we need to figure
+              // it out from a user defined part of the old import, which can be either
+              // part of the old import path, or an old import name / specifier.
+              // We give precedence to the old import name.
               if (importMapping.new.name === userDefName) {
                 if (importMapping.old.name === userDefName
                     && oldImportSpecifier.type === "ImportSpecifier") {
@@ -131,7 +144,7 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
       });
   }
 
-  // Add new import declarations, with all the new specifiers we collected in `newImports`.
+  // Add new import declarations to the AST, with all the new specifiers we collected in `newImports`.
   astRoot.find(j.Program).forEach((path) => {
     newImports.forEach((specifiers, source) => {
       path.node.body.unshift(j.importDeclaration(specifiers, j.literal(source)));
