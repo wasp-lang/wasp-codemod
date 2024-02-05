@@ -1,3 +1,4 @@
+import { superCoolJob, amazingJob } from "wasp/server/jobs";
 import { type SomeEntity, type AnotherEntity } from "wasp/entities";
 
 import {
@@ -6,7 +7,6 @@ import {
   GoogleSignInButton,
 } from "wasp/client/auth";
 
-import { superCoolJob, amazingJob } from "wasp/server/jobs";
 import { type BestApiEver, type OneMoreApi } from "wasp/server/api";
 import { type DoSomething, type GetSomething as GetSomethingType } from "wasp/server/operations";
 import { doSomething, getSomething as getSomethingPliz } from "wasp/client/operations";

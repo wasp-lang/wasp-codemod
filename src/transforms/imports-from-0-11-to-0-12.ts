@@ -132,9 +132,11 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
 
           const doesAnImportSpecifierMatchOldImportName: boolean =
             areBothImportsDefault
-            || areBothImportsNamed &&
-                (doesOldImportNameMatchAnything
-                 || importSpecifier.imported.name === importMapping.old.name)
+            || (areBothImportsNamed
+                && (importMapping.old.name === userDefName
+                    || importMapping.old.name === importSpecifier.imported.name
+                   )
+               );
 
           if (doesAnImportSpecifierMatchOldImportName) {
             matchingImportSpecifiers.push(importSpecifier);
@@ -160,12 +162,12 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
                 return importMapping.new.name;
               }
               if (importMapping.new.name === userDefName) {
-                if (userDefImportPathName) {
-                  return userDefImportPathName;
-                }
                 if (importMapping.old.name === userDefName
                     && oldImportSpecifier.type === "ImportSpecifier") {
                   return oldImportSpecifier.imported.name;
+                }
+                if (userDefImportPathName) {
+                  return userDefImportPathName;
                 }
                 throw new Error("I don't know how to determine name for new import.");
               }
