@@ -1,4 +1,11 @@
-import { API, FileInfo, Options, ImportSpecifier } from "jscodeshift";
+import {
+  API,
+  FileInfo,
+  Options,
+  ImportSpecifier,
+  ImportDefaultSpecifier,
+  ImportNamespaceSpecifier,
+} from "jscodeshift";
 
 export const parser = "tsx";
 
@@ -105,7 +112,20 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
       // Time to do actual import mapping: determine new import specifiers (if any)
       // for the matching old import specifiers, based on the import mapping,
       // and add them to the `newImports`.
-      if (importMapping.new !== null) {
+      if (importMapping.new === null) {
+        const commentLine = j.commentLine(
+          " TODO: Removed " +
+            matchingImportSpecifiers.map((s) => "`" + getImportSpecifierName(s) + "`").join(", ") +
+            ' from "' +
+            importMapping.old.path +
+            '" import because it is deprecated and has no clear alternative. Please check migration instructions in Wasp docs on how to manually migrate the code that was using it.',
+        );
+
+        astRoot.find(j.Program).forEach((path) => {
+          path.node.comments = path.node.comments || [];
+          path.node.comments.push(commentLine);
+        });
+      } else if (importMapping.new !== null) {
         for (const oldImportSpecifier of matchingImportSpecifiers) {
           const newName: string = (() => {
             // If new import name is fixed, use it.
@@ -161,6 +181,19 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
   });
 
   return astRoot.toSource();
+}
+
+function getImportSpecifierName(
+  specifier: ImportSpecifier | ImportDefaultSpecifier | ImportNamespaceSpecifier,
+): string {
+  switch (specifier.type) {
+    case "ImportSpecifier":
+      return specifier.imported.name;
+    case "ImportDefaultSpecifier":
+      return specifier.local?.name ?? "default";
+    case "ImportNamespaceSpecifier":
+      return specifier.local?.name ?? "namespace";
+  }
 }
 
 // Returns a string in case when old import path is regex and it matched the given import path.
@@ -250,7 +283,7 @@ const importMappings: ImportMapping[] = [
   },
   {
     old: { path: "@wasp/auth", name: "defineAdditionalSignupFields" },
-    new: null,
+    new: { path: "wasp/server/auth", name: "defineUserSignupFields" },
   },
   {
     old: { path: "@wasp/types", name: "GetUserFieldsFn" },
