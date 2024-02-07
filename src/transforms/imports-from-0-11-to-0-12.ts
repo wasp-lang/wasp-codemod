@@ -249,6 +249,22 @@ const importMappings: ImportMapping[] = [
     new: null,
   },
   {
+    old: { path: "@wasp/auth", name: "defineAdditionalSignupFields" },
+    new: null,
+  },
+  {
+    old: { path: "@wasp/types", name: "GetUserFieldsFn" },
+    new: null,
+  },
+  {
+    old: { path: "@wasp/core/auth", name: "generateAvailableDictionaryUsername" },
+    new: null,
+  },
+  {
+    old: { path: "@wasp/core/auth", name: "generateAvailableUsername" },
+    new: null,
+  },
+  {
     old: { path: "@wasp/actions", name: "useAction" },
     new: { path: "wasp/client/operations", name: "useAction" },
   },

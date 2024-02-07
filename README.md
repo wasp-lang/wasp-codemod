@@ -25,9 +25,14 @@ Example:
 npm run imports-0-11 -- /home/martin/git/MyWaspProject/src
 ```
 
-NOTE: `isPrismaError` and `prismaErrorToHttpError` from `@wasp/utils` stopped existing,
-  and while we will remove that those imports for you, make sure to manually update any code that
-  was using those imports.
+NOTE: Some imports stopped existing and there is nothing to rewrite them to, because they don't make sense any more
+  (mostly due to big updates in Wasp Auth).
+  We will remove those imports for you, but make sure to manually update any code that was using those imports.
+  These are the following:
+  - `import { isPrismaError, prismaErrorToHttpError } from '@wasp/utils'`
+  - `import { defineAdditionalSignupFields } from '@wasp/auth/index.js'`
+  - `import { GetUserFieldsFn } from '@wasp/types'`
+  - `import { generateAvailableDictionaryUsername, generateAvailableUsername } from '@wasp/core/auth.js'`
 
 NOTE: The only imports we don't automatically rewrite for you are `crud` imports.
   If you have any of those (they start with `@wasp/crud/`), make sure to rewrite them manually.
