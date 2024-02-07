@@ -280,7 +280,7 @@ const importMappings: ImportMapping[] = [
     new: { path: "wasp/client/auth", name: "login" },
   },
   {
-    old: { path: "@wasp/auth/logout", name: "logout" },
+    old: { path: "@wasp/auth/logout", name: defaultName },
     new: { path: "wasp/client/auth", name: "logout" },
   },
   {
@@ -422,6 +422,22 @@ const importMappings: ImportMapping[] = [
   {
     old: { path: "@wasp/types", name: "Express" },
     new: { path: "express", name: "Express", isType: true },
+  },
+  {
+    old: { path: "@wasp/webSocket", name: "ServerToClientPayload" },
+    new: { path: "wasp/client/webSocket", name: "ServerToClientPayload", isType: true },
+  },
+  {
+    old: { path: "@wasp/webSocket", name: "ClientToServerPayload" },
+    new: { path: "wasp/client/webSocket", name: "ClientToServerPayload", isType: true },
+  },
+  {
+    old: { path: "@wasp/webSocket", name: "useSocket" },
+    new: { path: "wasp/client/webSocket", name: "useSocket" },
+  },
+  {
+    old: { path: "@wasp/webSocket", name: "useSocketListener" },
+    new: { path: "wasp/client/webSocket", name: "useSocketListener" },
   },
   {
     old: { path: "@wasp/webSocket", name: "WebSocketDefinition" },
