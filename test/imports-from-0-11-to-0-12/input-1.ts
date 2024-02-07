@@ -17,6 +17,8 @@ import { type BestApiEver, type OneMoreApi } from "@wasp/apis/types";
 import { type SomeEntity, type AnotherEntity } from "@wasp/entities";
 import { superCoolJob } from "@wasp/jobs/superCoolJob";
 import { amazingJob } from "@wasp/jobs/amazingJob";
+import { type AmazingJob } from "@wasp/jobs/amazingJob";
+import type { AmazingJob2 } from "@wasp/jobs/amazingJob2";
 // Testing unknown import from @wasp.
 import { foo } from "@wasp/foo";
 // Testing unknown import from external package.

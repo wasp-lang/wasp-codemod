@@ -1,4 +1,4 @@
-import { superCoolJob, amazingJob } from "wasp/server/jobs";
+import { superCoolJob, amazingJob, type AmazingJob, type AmazingJob2 } from "wasp/server/jobs";
 import { type SomeEntity, type AnotherEntity } from "wasp/entities";
 
 import {

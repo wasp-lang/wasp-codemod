@@ -41,6 +41,10 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
   // them to `newImports` map.
   for (const importMapping of importMappings) {
     astRoot.find(j.ImportDeclaration).forEach((astPath) => {
+      // True if import declaration we are observing has 'type' in front of `{ ... }`,
+      // e.g. `import type { Foo, Bar } from "foo/bar"`.
+      const isImportDeclarationATypeImport = astPath.value.importKind === "type";
+
       // Check if the import path matches the old import path of the import mapping.
       // If it doesn't, skip this import declaration.
       const importPathsMatch =
@@ -129,7 +133,16 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
 
           const newSpecifier = j.importSpecifier(j.identifier(newName), oldImportSpecifier.local);
 
-          if (importMapping.new.isType) {
+          // We determine if new specifier (import name) is `type` based on the old import name (specifier):
+          // if old imported name was a type, new one is also. Unless, in the importMapping, it is
+          // explicitly stated that the new import name is or is not a type, in that case we use that.
+          if (
+            importMapping.new.isType !== false &&
+            (isImportDeclarationATypeImport ||
+              // @ts-expect-error https://github.com/benjamn/ast-types/pull/725 .
+              oldImportSpecifier.importKind === "type" ||
+              importMapping.new.isType === true)
+          ) {
             // @ts-expect-error https://github.com/benjamn/ast-types/pull/725 .
             newSpecifier.importKind = "type";
           }
