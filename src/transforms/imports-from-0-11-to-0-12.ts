@@ -451,7 +451,7 @@ const importMappings: ImportMapping[] = [
   },
   {
     old: { path: "@wasp/email", name: "emailSender" },
-    new: { path: "wasp/email", name: "emailSender" },
+    new: { path: "wasp/server/email", name: "emailSender" },
   },
   {
     old: { path: "@wasp/entities", name: userDefName },
