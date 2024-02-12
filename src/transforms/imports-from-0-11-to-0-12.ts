@@ -589,4 +589,12 @@ const importMappings: ImportMapping[] = [
     old: { path: "@wasp/auth/forms/internal/Form", name: "FormLabel" },
     new: { path: "wasp/client/auth", name: "FormLabel" },
   },
+  {
+    old: { path: "@wasp/email/core/types", name: "Email" },
+    new: { path: "wasp/server/email", name: "Email", isType: true },
+  },
+  {
+    old: { path: "@wasp/email/core/types", name: "EmailFromField" },
+    new: { path: "wasp/server/email", name: "EmailFromField", isType: true },
+  },
 ];
