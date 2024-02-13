@@ -109,65 +109,69 @@ export default function transformer(fileInfo: FileInfo, api: API, options: Optio
         j(astPath).remove();
       }
 
-      // Time to do actual import mapping: determine new import specifiers (if any)
-      // for the matching old import specifiers, based on the import mapping,
-      // and add them to the `newImports`.
-      if (importMapping.new === null) {
-        const commentLine = j.commentLine(
-          " TODO: Removed " +
-            matchingImportSpecifiers.map((s) => "`" + getImportSpecifierName(s) + "`").join(", ") +
-            ' from "' +
-            importMapping.old.path +
-            '" import because it is deprecated and has no clear alternative. Please check migration instructions in Wasp docs on how to manually migrate the code that was using it.',
-        );
+      // Time to do actual import mapping!
+      // If we matches any imports to be remmaped, add the corresponding new imports to the `newImports`.
+      // If we don't know what to remap them to, just leave a comment with TODO and instructions to figure it out.
+      if (matchingImportSpecifiers.length) {
+        if (importMapping.new === null) {
+          const commentLine = j.commentLine(
+            " TODO: Removed " +
+              matchingImportSpecifiers
+                .map((s) => "`" + getImportSpecifierName(s) + "`")
+                .join(", ") +
+              ' from "' +
+              importMapping.old.path +
+              '" import because it is deprecated and has no clear alternative. Please check migration instructions in Wasp docs on how to manually migrate the code that was using it.',
+          );
 
-        astRoot.find(j.Program).forEach((path) => {
-          path.node.comments = path.node.comments || [];
-          path.node.comments.push(commentLine);
-        });
-      } else if (importMapping.new !== null) {
-        for (const oldImportSpecifier of matchingImportSpecifiers) {
-          const newName: string = (() => {
-            // If new import name is fixed, use it.
-            if (typeof importMapping.new.name === "string") {
-              return importMapping.new.name;
-            }
-            // If new import name is user defined, that means we need to figure
-            // it out from a user defined part of the old import, which can be either
-            // part of the old import path, or an old import name / specifier.
-            // We give precedence to the old import name.
-            if (importMapping.new.name === userDefName) {
-              if (
-                importMapping.old.name === userDefName &&
-                oldImportSpecifier.type === "ImportSpecifier"
-              ) {
-                return oldImportSpecifier.imported.name;
+          astRoot.find(j.Program).forEach((path) => {
+            path.node.comments = path.node.comments || [];
+            path.node.comments.push(commentLine);
+          });
+        } else if (importMapping.new !== null) {
+          for (const oldImportSpecifier of matchingImportSpecifiers) {
+            const newName: string = (() => {
+              // If new import name is fixed, use it.
+              if (typeof importMapping.new.name === "string") {
+                return importMapping.new.name;
               }
-              if (userDefImportPathName) {
-                return userDefImportPathName;
+              // If new import name is user defined, that means we need to figure
+              // it out from a user defined part of the old import, which can be either
+              // part of the old import path, or an old import name / specifier.
+              // We give precedence to the old import name.
+              if (importMapping.new.name === userDefName) {
+                if (
+                  importMapping.old.name === userDefName &&
+                  oldImportSpecifier.type === "ImportSpecifier"
+                ) {
+                  return oldImportSpecifier.imported.name;
+                }
+                if (userDefImportPathName) {
+                  return userDefImportPathName;
+                }
+                throw new Error("I don't know how to determine name for new import.");
               }
-              throw new Error("I don't know how to determine name for new import.");
-            }
-            throw new Error("This should never happen.");
-          })();
+              throw new Error("This should never happen.");
+            })();
 
-          const newSpecifier = j.importSpecifier(j.identifier(newName), oldImportSpecifier.local);
+            const newSpecifier = j.importSpecifier(j.identifier(newName), oldImportSpecifier.local);
 
-          // We determine if new specifier (import name) is `type` based on the old import name (specifier):
-          // if old imported name was a type, new one is also. Unless, in the importMapping, it is
-          // explicitly stated that the new import name is or is not a type, in that case we use that.
-          if (
-            importMapping.new.isType !== false &&
-            (isImportDeclarationATypeImport ||
+            // We determine if new specifier (import name) is `type` based on the old import name (specifier):
+            // if old imported name was a type, new one is also. Unless, in the importMapping, it is
+            // explicitly stated that the new import name is or is not a type, in that case we use that.
+            if (
+              importMapping.new.isType !== false &&
+              (isImportDeclarationATypeImport ||
+                // @ts-expect-error https://github.com/benjamn/ast-types/pull/725 .
+                oldImportSpecifier.importKind === "type" ||
+                importMapping.new.isType === true)
+            ) {
               // @ts-expect-error https://github.com/benjamn/ast-types/pull/725 .
-              oldImportSpecifier.importKind === "type" ||
-              importMapping.new.isType === true)
-          ) {
-            // @ts-expect-error https://github.com/benjamn/ast-types/pull/725 .
-            newSpecifier.importKind = "type";
-          }
+              newSpecifier.importKind = "type";
+            }
 
-          addImportToNewImports(importMapping.new.path, newSpecifier);
+            addImportToNewImports(importMapping.new.path, newSpecifier);
+          }
         }
       }
     });

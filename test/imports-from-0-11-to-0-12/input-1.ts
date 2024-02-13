@@ -21,6 +21,8 @@ import { type AmazingJob } from "@wasp/jobs/amazingJob";
 import type { AmazingJob2 } from "@wasp/jobs/amazingJob2";
 // Testing unknown import from @wasp.
 import { foo } from "@wasp/foo";
+// Testing import from @wasp that has known path but uknown specifier.
+import { sleep } from "@wasp/utils";
 // Testing unknown import from external package.
 import { useState } from "react";
 
