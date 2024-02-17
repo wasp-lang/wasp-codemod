@@ -358,6 +358,10 @@ const importMappings: ImportMapping[] = [
     new: { path: "wasp/client/auth", name: "useAuth" },
   },
   {
+    old: { path: "@wasp/auth/useAuth", name: "getMe" },
+    new: { path: "wasp/client/auth", name: "getMe" },
+  },
+  {
     old: { path: "@wasp/auth/email/actions", name: "requestPasswordReset" },
     new: { path: "wasp/client/auth", name: "requestPasswordReset" },
   },

@@ -25,6 +25,8 @@ import { foo } from "@wasp/foo";
 import { sleep } from "@wasp/utils";
 // Testing unknown import from external package.
 import { useState } from "react";
+// Testing getMe from @wasp/auth/useAuth
+import { getMe } from "@wasp/auth/useAuth";
 
 console.log(foo + bar + foo2);
 console.log(test);
